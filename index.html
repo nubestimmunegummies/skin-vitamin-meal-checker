@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skin-Vitamin Meal Checker: See Which Skin Vitamins Your Plate Covers</title>
+  <meta name="description" content="A small, dependency-free JavaScript tool that shows which of five skin-supporting vitamins (C, E, A, D, B3) your meal covers and suggests foods for the gaps.">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Skin-Vitamin Meal Checker">
+  <meta property="og:description" content="Tick the foods on your plate and see which of vitamins C, E, A, D, and B3 you've covered.">
+  <meta property="og:image" content="https://nubestimmunegummies.github.io/skin-vitamin-meal-checker/assets/top-5-vitamins-skin-glow-ig-3x2.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <h1>Skin-Vitamin Meal Checker</h1>
+      <p class="lede">Tick the foods on your plate. The checker shows which of five skin-supporting vitamins you’ve covered and suggests foods for anything missing.</p>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <section class="panel" aria-labelledby="foods-heading">
+      <h2 id="foods-heading">What’s on your plate today?</h2>
+      <fieldset id="food-list">
+        <legend class="visually-hidden">Foods</legend>
+      </fieldset>
+      <button type="button" id="clear" class="quiet">Clear selection</button>
+    </section>
+
+    <section class="panel" aria-labelledby="result-heading">
+      <h2 id="result-heading">Your coverage</h2>
+      <div id="result" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="wrap footnote">
+    <p>Vitamin list based on <a href="https://www.nubest.com/blogs/beauty-care/best-vitamins-for-skin">Top 5 Best Vitamins for Skin Glow</a> in the NuBest Health Library.</p>
+    <p>This is a coding demo for general education, not medical or nutrition advice. Talk with a healthcare provider before starting any supplement.</p>
+  </footer>
+
+  <script>
+    const VITAMINS = {
+      C: 'Supports natural collagen production',
+      E: 'Helps skin hold onto moisture',
+      A: 'Plays a part in natural skin cell renewal',
+      D: 'Studied for its role in the skin barrier',
+      B3: 'Researched for supporting ceramides',
+    };
+
+    const FOODS = [
+      { name: 'Orange', vitamins: ['C'] },
+      { name: 'Kiwi', vitamins: ['C'] },
+      { name: 'Red bell pepper', vitamins: ['C', 'A'] },
+      { name: 'Almonds', vitamins: ['E'] },
+      { name: 'Avocado', vitamins: ['E'] },
+      { name: 'Spinach', vitamins: ['E', 'A'] },
+      { name: 'Carrots', vitamins: ['A'] },
+      { name: 'Sweet potato', vitamins: ['A'] },
+      { name: 'Eggs', vitamins: ['A', 'D'] },
+      { name: 'Salmon', vitamins: ['D', 'B3'] },
+      { name: 'UV-exposed mushrooms', vitamins: ['D', 'B3'] },
+      { name: 'Chicken', vitamins: ['B3'] },
+      { name: 'Peanuts', vitamins: ['B3'] },
+    ];
+
+    function checkMeal(selectedNames) {
+      const chosen = new Set(selectedNames);
+      const covered = new Set(
+        FOODS
+          .filter((food) => chosen.has(food.name))
+          .flatMap((food) => food.vitamins)
+      );
+      const missing = Object.keys(VITAMINS).filter((v) => !covered.has(v));
+      return { covered, missing };
+    }
+
+    function suggestFoods(missing, selectedNames, limit = 3) {
+      const chosen = new Set(selectedNames);
+      return missing.map((vitamin) => ({
+        vitamin,
+        foods: FOODS
+          .filter((food) => food.vitamins.includes(vitamin) && !chosen.has(food.name))
+          .slice(0, limit)
+          .map((food) => food.name),
+      }));
+    }
+
+    const list = document.querySelector('#food-list');
+    const result = document.querySelector('#result');
+
+    for (const food of FOODS) {
+      const label = document.createElement('label');
+      label.className = 'food';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = food.name;
+      const name = document.createElement('span');
+      name.textContent = food.name;
+      const tags = document.createElement('span');
+      tags.className = 'tags';
+      tags.textContent = food.vitamins.join(' · ');
+      label.append(box, name, tags);
+      list.append(label);
+    }
+
+    function selectedFoods() {
+      return [...list.querySelectorAll('input:checked')].map((box) => box.value);
+    }
+
+    list.addEventListener('change', () => render(selectedFoods()));
+
+    document.querySelector('#clear').addEventListener('click', () => {
+      list.querySelectorAll('input:checked').forEach((box) => { box.checked = false; });
+      render([]);
+    });
+
+    function render(selected) {
+      const { covered, missing } = checkMeal(selected);
+      const total = Object.keys(VITAMINS).length;
+
+      result.replaceChildren();
+
+      const score = document.createElement('p');
+      score.className = 'score';
+      score.textContent = `${covered.size} of ${total} vitamins covered`;
+
+      const bar = document.createElement('progress');
+      bar.max = total;
+      bar.value = covered.size;
+      bar.setAttribute('aria-label', 'Vitamin coverage');
+
+      const rows = document.createElement('ul');
+      rows.className = 'vitamins';
+      for (const [vitamin, role] of Object.entries(VITAMINS)) {
+        const row = document.createElement('li');
+        const isCovered = covered.has(vitamin);
+        row.className = isCovered ? 'covered' : 'missing';
+        row.dataset.vitamin = vitamin;
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = vitamin;
+
+        const text = document.createElement('span');
+        text.textContent = role;
+
+        const state = document.createElement('span');
+        state.className = 'state';
+        state.textContent = isCovered ? 'Covered' : 'Missing';
+
+        row.append(badge, text, state);
+        rows.append(row);
+      }
+
+      result.append(score, bar, rows);
+
+      if (missing.length === 0) {
+        const done = document.createElement('p');
+        done.className = 'tip';
+        done.textContent = 'All five covered. Nice variety.';
+        result.append(done);
+        return;
+      }
+
+      const tips = document.createElement('ul');
+      tips.className = 'tips';
+      for (const { vitamin, foods } of suggestFoods(missing, selected)) {
+        const item = document.createElement('li');
+        item.textContent = `Need vitamin ${vitamin}? Try ${foods.join(', ')}.`;
+        tips.append(item);
+      }
+      result.append(tips);
+    }
+
+    render([]);
+  </script>
+</body>
+</html>
